@@ -1,0 +1,23 @@
+{
+  "name": "how-do-you-spell",
+  "version": "1.0.0",
+  "description": "A Phaser.js game that tests your ability to spell Japanese character names correctly",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "game",
+    "phaser",
+    "spelling",
+    "educational",
+    "japanese"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "http": "0.0.1-security",
+    "fs": "0.0.1-security",
+    "path": "0.12.7"
+  }
+} 

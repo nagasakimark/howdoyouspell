@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How do you spell...</title>
+    <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+        }
+        @font-face {
+            font-family: 'ChalkFont';
+            src: url('assets/fonts/chalk.ttf') format('truetype');
+            font-display: block; /* Change from swap to block to avoid FOUT */
+            font-weight: normal;
+            font-style: normal;
+        }
+        /* Font preloading trick */
+        .font-preloader {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            visibility: hidden;
+            opacity: 0;
+            font-family: 'ChalkFont', Arial;
+            content: 'Font preloader';
+        }
+        canvas {
+            display: block;
+            image-rendering: auto;
+        }
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #error-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            color: white;
+            background-color: rgba(255, 0, 0, 0.7);
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            display: none;
+            z-index: 1000;
+        }
+        #debug-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 999;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none; /* Initially hidden */
+        }
+    </style>
+    <!-- Preload font to avoid FOUT (Flash of Unstyled Text) -->
+    <script>
+        // Create a FontFaceSet observer to know when our font is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add a hidden element with the custom font
+            const fontPreloader = document.createElement('div');
+            fontPreloader.className = 'font-preloader';
+            fontPreloader.innerHTML = 'Font preloader';
+            document.body.appendChild(fontPreloader);
+            
+            // Check when fonts are loaded
+            document.fonts.ready.then(() => {
+                console.log('All fonts loaded');
+                
+                // Force the browser to load the font
+                if (document.fonts.check('1em ChalkFont')) {
+                    console.log('ChalkFont is available');
+                    window.chalkFontLoaded = true;
+                } else {
+                    console.warn('ChalkFont is not available, will use fallback');
+                    window.chalkFontLoaded = false;
+                }
+                
+                // Add a class to indicate fonts are ready
+                document.documentElement.classList.add('fonts-loaded');
+            });
+        });
+    </script>
+</head>
+<body>
+    <!-- Font preloader elements -->
+    <div class="font-preloader">ChalkFont preloader</div>
+    
+    <!-- Game canvas -->
+    <canvas id="game-canvas" willReadFrequently="true"></canvas>
+    
+    <!-- Error display container -->
+    <div id="error-display"></div>
+    
+    <!-- Debug info container -->
+    <div id="debug-info"></div>
+    
+    <!-- Global error handler script -->
+    <script>
+        // Custom debug logger
+        const gameDebug = {
+            logElement: null,
+            maxEntries: 20,
+            entries: [],
+            visible: false,
+            
+            init: function() {
+                this.logElement = document.getElementById('debug-info');
+                
+                // Listen for numpad * key press to toggle debug display
+                document.addEventListener('keydown', (event) => {
+                    // 106 is the keyCode for numpad *
+                    if (event.keyCode === 106) {
+                        this.toggleVisibility();
+                    }
+                });
+                
+                // Override console methods to capture logs
+                const originalConsole = {
+                    log: console.log,
+                    warn: console.warn,
+                    error: console.error
+                };
+                
+                console.log = (...args) => {
+                    originalConsole.log.apply(console, args);
+                    this.addEntry('LOG', args);
+                };
+                
+                console.warn = (...args) => {
+                    originalConsole.warn.apply(console, args);
+                    this.addEntry('WARN', args);
+                };
+                
+                console.error = (...args) => {
+                    originalConsole.error.apply(console, args);
+                    this.addEntry('ERROR', args);
+                    
+                    // Show debug panel on errors for easier troubleshooting
+                    this.show();
+                };
+            },
+            
+            toggleVisibility: function() {
+                this.visible = !this.visible;
+                this.logElement.style.display = this.visible ? 'block' : 'none';
+                
+                if (this.visible) {
+                    this.updateDisplay(); // Refresh content when showing
+                }
+            },
+            
+            show: function() {
+                this.visible = true;
+                this.logElement.style.display = 'block';
+                this.updateDisplay();
+            },
+            
+            hide: function() {
+                this.visible = false;
+                this.logElement.style.display = 'none';
+            },
+            
+            addEntry: function(type, args) {
+                const timestamp = new Date().toLocaleTimeString();
+                const messages = args.map(arg => {
+                    if (arg === null) return 'null';
+                    if (arg === undefined) return 'undefined';
+                    if (typeof arg === 'object') {
+                        try {
+                            return JSON.stringify(arg);
+                        } catch (e) {
+                            return Object.prototype.toString.call(arg);
+                        }
+                    }
+                    return String(arg);
+                }).join(' ');
+                
+                this.entries.push(`[${timestamp}] ${type}: ${messages}`);
+                
+                // Keep only the most recent entries
+                if (this.entries.length > this.maxEntries) {
+                    this.entries.shift();
+                }
+                
+                // Only update the display if it's visible
+                if (this.visible) {
+                    this.updateDisplay();
+                }
+            },
+            
+            updateDisplay: function() {
+                if (this.logElement) {
+                    this.logElement.innerHTML = this.entries.join('<br>');
+                    this.logElement.scrollTop = this.logElement.scrollHeight;
+                }
+            }
+        };
+        
+        // Initialize the debug logger
+        document.addEventListener('DOMContentLoaded', () => {
+            gameDebug.init();
+            console.log('Debug logger initialized. Press numpad * to toggle debug panel.');
+        });
+        
+        // Set up global error handling
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorDisplay = document.getElementById('error-display');
+            errorDisplay.style.display = 'block';
+            
+            // Create a more informative error message
+            let errorInfo = `<h3>An error occurred:</h3>`;
+            errorInfo += `<p>${message}</p>`;
+            
+            if (source) {
+                const sourcePath = source.split('/').pop(); // Get just the filename
+                errorInfo += `<p>Source: ${sourcePath} (line ${lineno}, col ${colno})</p>`;
+            }
+            
+            if (error) {
+                errorInfo += `<p>Name: ${error.name}</p>`;
+                if (error.stack) {
+                    const stackLines = error.stack.split('\n').slice(0, 3).join('<br>');
+                    errorInfo += `<p>Stack: <br>${stackLines}</p>`;
+                }
+            } else {
+                errorInfo += `<p>No detailed error information available</p>`;
+            }
+            
+            errorInfo += `<button onclick="document.getElementById('error-display').style.display='none'">Dismiss</button>`;
+            errorInfo += `<button onclick="location.reload()">Reload Page</button>`;
+            
+            errorDisplay.innerHTML = errorInfo;
+            
+            // Log complete error details to the debug console
+            console.error('Game Error:', {
+                message,
+                source,
+                lineno,
+                colno,
+                error,
+                stack: error ? error.stack : 'No stack available'
+            });
+            
+            return true; // Prevents default error handling
+        };
+        
+        // Function to check if file exists (for critical assets)
+        function checkFileExists(url) {
+            return new Promise((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('HEAD', url, true);
+                xhr.onload = () => resolve(xhr.status !== 404);
+                xhr.onerror = () => resolve(false);
+                xhr.send();
+            });
+        }
+        
+        // Precheck critical assets before initializing Phaser
+        async function precheckAssets() {
+            console.log('Checking for critical assets...');
+            
+            const criticalAssets = [
+                'assets/images/favicon.ico',
+                'assets/images/chalkboard.png'
+            ];
+            
+            let allAssetsExist = true;
+            const missingAssets = [];
+            
+            for (const asset of criticalAssets) {
+                const exists = await checkFileExists(asset);
+                if (!exists) {
+                    allAssetsExist = false;
+                    missingAssets.push(asset);
+                }
+            }
+            
+            if (!allAssetsExist) {
+                console.warn('Missing critical assets:', missingAssets);
+                // We'll continue anyway, as our error handling should create placeholders
+            } else {
+                console.log('All critical assets found');
+            }
+        }
+        
+        // Run the precheck before loading the game
+        precheckAssets();
+    </script>
+    
+    <!-- Load Phaser first -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    
+    <!-- Load scenes -->
+    <script src="js/scenes/Boot.js"></script>
+    <script src="js/scenes/Preload.js"></script>
+    <script src="js/scenes/MainMenu.js"></script>
+    <script src="js/scenes/Game.js"></script>
+    <script src="js/scenes/Settings.js"></script>
+    <script src="js/scenes/Help.js"></script>
+    
+    <!-- Load configuration and main script after scenes are defined -->
+    <script src="js/config.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
