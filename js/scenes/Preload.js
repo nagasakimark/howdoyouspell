@@ -155,5 +155,4 @@ class Preload extends Phaser.Scene {
     }
 }
 
-// Explicitly add to window object
-window.Preload = Preload; 
+export default Preload; 

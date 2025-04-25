@@ -1,6 +1,7 @@
 class Game extends Phaser.Scene {
     constructor() {
         super({ key: 'Game' });
+        this.uiElements = new Map();
     }
 
     init() {
@@ -20,6 +21,9 @@ class Game extends Phaser.Scene {
         this.completionElements = []; // Track completion elements for cleanup
         this.usedCharacters = []; // Track characters used
         
+        // Track consecutive wrong attempts for current letter
+        this.consecutiveWrongAttempts = 0;
+        
         // Use the chalk font directly
         this.fontFamily = window.chalkFontLoaded ? 'ChalkFont, Arial' : 'Arial';
         console.log(`Game init using font: ${this.fontFamily}, chalkFontLoaded: ${window.chalkFontLoaded}`);
@@ -30,11 +34,16 @@ class Game extends Phaser.Scene {
             // Clean up any existing elements that might be left over from a previous game
             this.cleanupGame();
             
-            // Set background
-            this.add.image(0, 0, 'chalkboard').setOrigin(0).setDisplaySize(window.innerWidth, window.innerHeight);
+            // Set background with proper positioning to fill entire screen
+            const width = this.scale.gameSize.width;
+            const height = this.scale.gameSize.height;
             
-            const width = this.cameras.main.width;
-            const height = this.cameras.main.height;
+            this.background = this.add.image(width / 2, height / 2, 'chalkboard')
+                .setOrigin(0.5)
+                .setDisplaySize(width, height);
+                
+            // Make background responsive to canvas size changes
+            this.scale.on('resize', this.updateBackground, this);
             
             // Create UI elements
             this.createUI(width, height);
@@ -102,12 +111,15 @@ class Game extends Phaser.Scene {
             
             if (!this.characterImage) {
                 // First time - create the image
-                this.characterImage = this.add.image(width / 2, height * 0.32, textureToUse);
+                // Moved character position down to avoid overlap with title during animation
+                this.characterImage = this.add.image(width / 2, height * 0.4, textureToUse);
                 this.characterImage.setOrigin(0.5);
             } else {
                 // Update existing image
                 this.characterImage.setTexture(textureToUse);
                 this.characterImage.visible = true;
+                // Update position to match new positioning
+                this.characterImage.setPosition(width / 2, height * 0.4);
             }
             
             // Scale image to fit properly
@@ -148,8 +160,9 @@ class Game extends Phaser.Scene {
     scaleCharacterImage(textureKey) {
         if (!this.characterImage) return;
         
-        const maxWidth = this.cameras.main.width * 0.5;
-        const maxHeight = this.cameras.main.height * 0.35;
+        // Increased max dimensions to make character images larger
+        const maxWidth = this.cameras.main.width * 0.65;
+        const maxHeight = this.cameras.main.height * 0.45;
         
         // Get the image texture dimensions
         const texture = this.textures.get(textureKey || this.characterImage.texture.key);
@@ -171,6 +184,16 @@ class Game extends Phaser.Scene {
         }
         
         this.characterImage.setScale(scale);
+        
+        // Add a subtle floating animation to make the character look more alive
+        this.tweens.add({
+            targets: this.characterImage,
+            y: this.characterImage.y - 10,
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
     }
 
     updateTextElements() {
@@ -239,7 +262,7 @@ class Game extends Phaser.Scene {
             });
             
             // Create a display for the current word with chalk style
-            this.wordDisplay = this.add.text(width / 2, height * 0.55, '', {
+            this.wordDisplay = this.add.text(width / 2, height * 0.65, '', {
                 font: `64px ${this.fontFamily}`,
                 fill: '#ffffff',  // White chalk
                 stroke: '#ffffff',  // White chalk outline
@@ -401,27 +424,24 @@ class Game extends Phaser.Scene {
         const gridWidth = buttonSpacing * buttonsPerRow;
         const gridHeight = buttonSpacing * rows;
         
-        // The grid should be centered horizontally and positioned lower on the screen
+        // The grid should be centered horizontally and positioned higher on the screen
+        // to be closer to the word display
         const gridX = width / 2 - gridWidth / 2 + buttonSpacing / 2;
-        const gridY = height * 0.75; // Move grid lower
+        const gridY = height * 0.8; // Move grid higher
         
         // Container padding
         const containerPadding = 20;
         
-        // Create a border for letter buttons area
-        const buttonContainer = this.add.rectangle(
-            width / 2,
-            gridY + gridHeight/2 - buttonSpacing/2,
-            gridWidth + containerPadding * 2,
-            gridHeight + containerPadding * 2,
-            0x000000,
-            0
-        );
-        buttonContainer.setOrigin(0.5);
-        buttonContainer.setStrokeStyle(3, 0xffffff, 0.7);  // White chalk border
-        
-        // Store the container for later
-        this.letterContainer = buttonContainer;
+        // We still need to track container dimensions for layout purposes
+        // but we're not creating a visible container anymore
+        this.letterContainer = {
+            width: gridWidth + containerPadding * 2,
+            height: gridHeight + containerPadding * 2,
+            x: width / 2,
+            y: gridY + gridHeight/2 - buttonSpacing/2,
+            setSize: function(w, h) { this.width = w; this.height = h; },
+            setPosition: function(x, y) { this.x = x; this.y = y; }
+        };
         
         // Create chalk-style letter buttons
         for (let r = 0; r < rows; r++) {
@@ -547,13 +567,16 @@ class Game extends Phaser.Scene {
             this.currentWord += nextLetter; // Add the correct case version
             this.wordDisplay.setText(this.currentWord);
             
+            // Reset wrong attempts counter when correct letter is selected
+            this.consecutiveWrongAttempts = 0;
+            
             // Check if word is complete
             if (this.currentWord.length === this.targetWord.length) {
                 // Show sparkle animation before proceeding to completion
                 this.showCorrectAnimation();
             }
         } else {
-            // Wrong letter - just shake the display, don't track mistakes anymore
+            // Wrong letter - shake the display
             this.tweens.add({
                 targets: this.wordDisplay,
                 x: this.wordDisplay.x + 10,
@@ -561,6 +584,16 @@ class Game extends Phaser.Scene {
                 yoyo: true,
                 repeat: 3
             });
+            
+            // Increment wrong attempts counter
+            this.consecutiveWrongAttempts++;
+            
+            // Show hint after 3 wrong attempts
+            if (this.consecutiveWrongAttempts >= 3) {
+                this.showHint();
+                // Reset counter after showing hint
+                this.consecutiveWrongAttempts = 0;
+            }
         }
     }
 
@@ -1018,12 +1051,16 @@ class Game extends Phaser.Scene {
         
         // Start a new character
         try {
-            // Set background - this line was missing
-            this.add.image(0, 0, 'chalkboard').setOrigin(0).setDisplaySize(window.innerWidth, window.innerHeight);
+            // Get current dimensions
+            const width = this.scale.gameSize.width;
+            const height = this.scale.gameSize.height;
+            
+            // Set background with proper positioning
+            this.background = this.add.image(width / 2, height / 2, 'chalkboard')
+                .setOrigin(0.5)
+                .setDisplaySize(width, height);
             
             // Create basic UI elements 
-            const width = this.cameras.main.width;
-            const height = this.cameras.main.height;
             this.createUI(width, height);
             
             // Then start first character
@@ -1221,6 +1258,16 @@ class Game extends Phaser.Scene {
                     child.destroy();
                 }
             });
+
+            // Clear any remaining UI elements from the map
+            if (this.uiElements) {
+                this.uiElements.forEach((element) => {
+                    if (element && element.destroy) {
+                        element.destroy();
+                    }
+                });
+                this.uiElements.clear();
+            }
         } catch (error) {
             console.error('Error in cleanupGame:', error);
         }
@@ -1240,7 +1287,22 @@ class Game extends Phaser.Scene {
             this.scene.start('MainMenu');
         }
     }
+
+    // Simple function to ensure background covers the screen
+    updateBackground(gameSize) {
+        if (this.background) {
+            this.background.setPosition(gameSize.width / 2, gameSize.height / 2)
+                .setDisplaySize(gameSize.width, gameSize.height);
+        }
+    }
+
+    shutdown() {
+        // Clean up event listeners
+        this.scale.off('resize', this.updateBackground, this);
+        
+        // Clean up other resources
+        this.cleanupGame();
+    }
 }
 
-// Explicitly add to window object
-window.Game = Game; 
+export default Game; 

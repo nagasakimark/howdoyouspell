@@ -4,17 +4,22 @@ class Settings extends Phaser.Scene {
     }
 
     create() {
-        // Set background
-        this.add.image(0, 0, 'chalkboard').setOrigin(0).setDisplaySize(window.innerWidth, window.innerHeight);
+        const width = this.scale.gameSize.width;
+        const height = this.scale.gameSize.height;
         
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
+        // Set background with proper positioning
+        this.background = this.add.image(width / 2, height / 2, 'chalkboard')
+            .setOrigin(0.5)
+            .setDisplaySize(width, height);
+            
+        // Make background responsive to canvas size changes
+        this.scale.on('resize', this.updateBackground, this);
         
         // Use the ChalkFont directly
         const fontFamily = 'ChalkFont, Arial';
         
         // Add settings title
-        const title = this.add.text(width / 2, height / 6, 'SETTINGS', {
+        const title = this.add.text(width / 2, height * 0.18, 'SETTINGS', {
             font: `48px ${fontFamily}`,
             fill: '#ffffff',  // White chalk
             stroke: '#ffffff',  // White chalk outline
@@ -23,11 +28,11 @@ class Settings extends Phaser.Scene {
         });
         title.setOrigin(0.5);
         
-        // Add a simple panel with a chalk-like border
-        const panelWidth = 500;
-        const panelHeight = 300; // Reduced height since we're removing volume slider
+        // Add a simple panel with a chalk-like border - make it wider
+        const panelWidth = 550;
+        const panelHeight = 350;
         const panelX = width / 2 - panelWidth / 2;
-        const panelY = height / 2 - panelHeight / 2 + 20;
+        const panelY = height / 2 - panelHeight / 2;
         
         // Create a chalk panel border (no background, just a white border)
         const panelBorder = this.add.rectangle(
@@ -41,18 +46,22 @@ class Settings extends Phaser.Scene {
         panelBorder.setOrigin(0.5);
         panelBorder.setStrokeStyle(4, 0xffffff, 0.8); // White chalk border
         
-        // Keyboard option
-        const keyboardText = this.add.text(width / 2 - 150, height / 3, 'Enable Keyboard:', {
-            font: `24px ${fontFamily}`,
+        // Calculate the vertical spacing within the panel
+        const topOffset = panelY + 70; // Start position for first element
+        const verticalSpacing = 80; // Space between elements
+        
+        // Keyboard option - Position relative to panel
+        const keyboardText = this.add.text(panelX + 40, topOffset, 'Enable Keyboard:', {
+            font: `28px ${fontFamily}`,
             fill: '#ffffff',
             stroke: '#ffffff',
             strokeThickness: 0.5
         });
         
-        // Create a chalk-style checkbox
+        // Create a chalk-style checkbox - Position relative to panel
         const checkboxSize = 30;
-        const checkboxX = width / 2 + 100;
-        const checkboxY = height / 3;
+        const checkboxX = panelX + panelWidth - 100;
+        const checkboxY = topOffset + keyboardText.height / 2;
         
         // Checkbox border
         const checkboxBorder = this.add.rectangle(
@@ -88,9 +97,9 @@ class Settings extends Phaser.Scene {
             checkMark.visible = window.gameSettings.keyboardEnabled;
         });
         
-        // Letter case option
-        const caseText = this.add.text(width / 2 - 150, height / 3 + 70, 'Letter Case:', {
-            font: `24px ${fontFamily}`,
+        // Letter case option - Position below keyboard option
+        const caseText = this.add.text(panelX + 40, topOffset + verticalSpacing, 'Letter Case:', {
+            font: `28px ${fontFamily}`,
             fill: '#ffffff',
             stroke: '#ffffff',
             strokeThickness: 0.5
@@ -101,10 +110,10 @@ class Settings extends Phaser.Scene {
         let currentCaseIndex = (window.gameSettings && window.gameSettings.uppercase) ? 0 : 
                                (window.gameSettings && window.gameSettings.lowercase) ? 1 : 2;
         
-        // Chalk-style dropdown
+        // Chalk-style dropdown - Position relative to panel
         const caseButton = this.add.text(
-            width / 2 + 100, 
-            height / 3 + 70, 
+            checkboxX, 
+            topOffset + verticalSpacing + caseText.height / 2, 
             caseOptions[currentCaseIndex], 
             {
                 font: `24px ${fontFamily}`,
@@ -117,9 +126,9 @@ class Settings extends Phaser.Scene {
         
         // Add a chalk border around the dropdown
         const caseButtonBorder = this.add.rectangle(
-            width / 2 + 100,
-            height / 3 + 70,
-            caseButton.width + 20,
+            checkboxX,
+            topOffset + verticalSpacing + caseText.height / 2,
+            caseButton.width + 30,
             caseButton.height + 10,
             0x000000,
             0
@@ -133,7 +142,7 @@ class Settings extends Phaser.Scene {
         caseButtonBorder.on('pointerdown', () => {
             currentCaseIndex = (currentCaseIndex + 1) % caseOptions.length;
             caseButton.setText(caseOptions[currentCaseIndex]);
-            caseButtonBorder.width = caseButton.width + 20;
+            caseButtonBorder.width = caseButton.width + 30;
             
             // Update game settings
             if (!window.gameSettings) {
@@ -148,7 +157,7 @@ class Settings extends Phaser.Scene {
             }
         });
         
-        // Back button - positioned within the panel border
+        // Back button - positioned at the bottom of the panel
         const backButtonWidth = 180;
         const backButtonHeight = 60;
         
@@ -204,7 +213,19 @@ class Settings extends Phaser.Scene {
             });
         });
     }
+    
+    // Simple function to ensure background covers the screen
+    updateBackground(gameSize) {
+        if (this.background) {
+            this.background.setPosition(gameSize.width / 2, gameSize.height / 2)
+                .setDisplaySize(gameSize.width, gameSize.height);
+        }
+    }
+    
+    shutdown() {
+        // Clean up event listeners
+        this.scale.off('resize', this.updateBackground, this);
+    }
 }
 
-// Explicitly add to window object
-window.Settings = Settings; 
+export default Settings; 

@@ -306,16 +306,7 @@
     <!-- Load Phaser first -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     
-    <!-- Load scenes -->
-    <script src="js/scenes/Boot.js"></script>
-    <script src="js/scenes/Preload.js"></script>
-    <script src="js/scenes/MainMenu.js"></script>
-    <script src="js/scenes/Game.js"></script>
-    <script src="js/scenes/Settings.js"></script>
-    <script src="js/scenes/Help.js"></script>
-    
-    <!-- Load configuration and main script after scenes are defined -->
-    <script src="js/config.js"></script>
-    <script src="js/main.js"></script>
+    <!-- Load game scripts as modules -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

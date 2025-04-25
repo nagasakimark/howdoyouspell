@@ -1,7 +1,9 @@
+import config from './config.js';
+
 let game;
 
 // Game settings with default values
-const gameSettings = {
+window.gameSettings = {
     keyboardEnabled: false,
     uppercase: true,
     lowercase: false,
@@ -30,34 +32,83 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Check if config is available
-    if (typeof config === 'undefined') {
-        console.error('Game config not loaded! Check config.js');
-        return;
-    }
-    
-    // Check if all required scene classes are defined
-    const requiredScenes = ['Boot', 'Preload', 'MainMenu', 'Game', 'Settings', 'Help'];
-    const missingScenes = requiredScenes.filter(scene => typeof window[scene] !== 'function');
-    
-    if (missingScenes.length > 0) {
-        console.error('Missing scene classes:', missingScenes);
-        return;
-    }
-    
     console.log('All prerequisites checked, initializing game');
     
     try {
         // Create the game with the config
         game = new Phaser.Game(config);
         
-        // Handle window resize
+        // Force an initial resize
+        if (game && game.scale) {
+            setTimeout(() => {
+                game.scale.refresh();
+            }, 100);
+        }
+        
+        // Simple resize handler - just refresh the scale when size changes
         window.addEventListener('resize', function() {
-            console.log('Window resized, adjusting game dimensions');
+            console.log('Window resized, refreshing game scale');
             if (game && game.scale) {
-                game.scale.resize(window.innerWidth, window.innerHeight);
+                game.scale.refresh();
             }
         });
+        
+        // Also handle fullscreen changes
+        document.addEventListener('fullscreenchange', function() {
+            console.log('Fullscreen changed, refreshing game scale');
+            if (game && game.scale) {
+                game.scale.refresh();
+            }
+        });
+        
+        // Detect maximize/restore events (works in most modern browsers)
+        window.addEventListener('maximized', function() {
+            console.log('Window maximized, refreshing game scale');
+            handleWindowChange();
+        });
+        
+        window.addEventListener('restored', function() {
+            console.log('Window restored, refreshing game scale');
+            handleWindowChange();
+        });
+        
+        // Use a MutationObserver to detect window attribute changes (like maximize/restore)
+        // This is a more reliable way to catch maximize/restore events in browsers
+        const windowObserver = new MutationObserver(function(mutations) {
+            handleWindowChange();
+        });
+        
+        // Start observing window attribute changes (size, position, etc.)
+        if (window.outerWidth && window.outerHeight) {
+            let lastWidth = window.outerWidth;
+            let lastHeight = window.outerHeight;
+            
+            // Check periodically for maximize/restore changes
+            setInterval(function() {
+                const currentWidth = window.outerWidth;
+                const currentHeight = window.outerHeight;
+                
+                if (currentWidth !== lastWidth || currentHeight !== lastHeight) {
+                    console.log('Window size changed (maximize/restore detected)');
+                    handleWindowChange();
+                    lastWidth = currentWidth;
+                    lastHeight = currentHeight;
+                }
+            }, 500);
+        }
+        
+        // Function to handle window changes (resize, maximize, restore)
+        function handleWindowChange() {
+            if (game && game.scale) {
+                // Double refresh with delay to ensure proper scaling
+                game.scale.refresh();
+                
+                // Second refresh after a delay to catch any lingering issues
+                setTimeout(function() {
+                    game.scale.refresh();
+                }, 100);
+            }
+        }
         
         console.log('Game initialized successfully');
     } catch (error) {

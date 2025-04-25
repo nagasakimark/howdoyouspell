@@ -1,50 +1,37 @@
-// Create a custom canvas element with willReadFrequently attribute
-const createCustomCanvas = () => {
+import Boot from './scenes/Boot.js';
+import Preload from './scenes/Preload.js';
+import MainMenu from './scenes/MainMenu.js';
+import Game from './scenes/Game.js';
+import Settings from './scenes/Settings.js';
+import Help from './scenes/Help.js';
+
+// Fixed resolution for the entire game - standard 1080p
+const GAME_WIDTH = 1920;
+const GAME_HEIGHT = 1080;
+
+// Create a custom canvas with proper pixel ratio handling
+function createCanvas() {
     const canvas = document.createElement('canvas');
-    canvas.setAttribute('willReadFrequently', 'true');
-    document.body.appendChild(canvas);
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
     return canvas;
-};
+}
 
-// Define the scenes array safely
-const getScenes = () => {
-    console.log('Checking scene availability');
-    
-    // List of required scene classes
-    const sceneClasses = [
-        { key: 'Boot', class: window.Boot },
-        { key: 'Preload', class: window.Preload },
-        { key: 'MainMenu', class: window.MainMenu },
-        { key: 'Game', class: window.Game },
-        { key: 'Settings', class: window.Settings },
-        { key: 'Help', class: window.Help }
-    ];
-    
-    // Filter out any undefined scene classes and log warnings
-    const availableScenes = sceneClasses.filter(scene => {
-        const available = typeof scene.class === 'function';
-        if (!available) {
-            console.warn(`Scene class ${scene.key} is not available`);
-        } else {
-            console.log(`Scene class ${scene.key} is available`);
-        }
-        return available;
-    }).map(scene => scene.class);
-    
-    return availableScenes;
-};
-
+// Game configuration
 const config = {
-    // Explicitly set renderer to CANVAS
     type: Phaser.CANVAS,
-    width: window.innerWidth,
-    height: window.innerHeight,
-    backgroundColor: '#2c3e50', // Dark blue-ish color (chalkboard-like)
-    scene: getScenes(),
+    canvas: createCanvas(),
     scale: {
-        mode: Phaser.Scale.RESIZE,
+        mode: Phaser.Scale.EXACT_FIT,  // Always stretch to fit the window exactly
+        parent: 'game',
+        width: GAME_WIDTH,
+        height: GAME_HEIGHT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
+    backgroundColor: '#000000',
     physics: {
         default: 'arcade',
         arcade: {
@@ -52,36 +39,13 @@ const config = {
             debug: false
         }
     },
-    // Canvas configuration
-    canvas: document.getElementById('game-canvas') || createCustomCanvas(),
-    canvasStyle: 'display: block; width: 100%; height: 100%;',
-    // Disable pixel art mode to make text smoother
-    pixelArt: false,
-    antialias: true,
-    // Improve text rendering
     render: {
+        pixelArt: false,
         antialias: true,
-        crisp: false,
-        roundPixels: false
+        roundPixels: true
     },
-    // Add callbacks
-    callbacks: {
-        preBoot: function (game) {
-            console.log('Phaser preBoot callback');
-            
-            // Make sure custom fonts are loaded
-            document.fonts.ready.then(() => {
-                console.log('Fonts are loaded and ready');
-                if (document.fonts.check('1em ChalkFont')) {
-                    console.log('ChalkFont is available');
-                } else {
-                    console.warn('ChalkFont is not available, will use fallback');
-                }
-            });
-        },
-        postBoot: function (game) {
-            console.log('Phaser postBoot callback - game is running');
-        }
-    },
-    disableContextMenu: true
-}; 
+    scene: [Boot, Preload, MainMenu, Game, Settings, Help]
+};
+
+// Export the configuration
+export default config; 

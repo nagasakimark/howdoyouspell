@@ -42,5 +42,4 @@ class Boot extends Phaser.Scene {
     }
 }
 
-// Explicitly add to window object
-window.Boot = Boot; 
+export default Boot; 
