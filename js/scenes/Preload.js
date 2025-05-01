@@ -3,7 +3,7 @@ class Preload extends Phaser.Scene {
         super({ key: 'Preload' });
         this.characterFiles = [
             'anpanman.png', 'conan.png', 'doraemon.png', 'goku.png', 
-            'kirby.png', 'luffy.png', 'mario.png', 'naruto.png', 
+            'kirby.png', 'luffy.png', 'mario.png', 
             'pikachu.png', 'sonic.png', 'totoro.png'
         ];
     }
